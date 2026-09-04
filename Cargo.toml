@@ -1,0 +1,22 @@
+[package]
+name = "winky-ariel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = ["time","uart"] }
+ariel-os-boards = { path = "build/imports/ariel-os/src/ariel-os-boards" }
+
+esp-hal = { version = "~1.0", features = ["unstable"] }
+esp-hal-smartled = { path= "/home/sautax/git/esp-hal-community/esp-hal-smartled", features = [
+  "esp32c6",
+] }
+smart-leds = "0.4.0"
+embassy-time = { version = "0.5.1", default-features = false }
+embedded-io-async = { version = "0.6.1", default-features = false }
+
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(context, values(any()))',
+] }

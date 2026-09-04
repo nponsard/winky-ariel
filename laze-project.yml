@@ -1,0 +1,10 @@
+imports:
+  - git:
+      url: https://github.com/ariel-os/ariel-os
+      tag: v0.5.0
+    dldir: ariel-os
+
+apps:
+  - name: winky-ariel
+    context:
+      - espressif-esp32-c6-devkitc-1
