@@ -7,7 +7,7 @@
             "overrideCommand": [
               "cargo",
               "check",
-              "--features=ariel-os/panic-printing,ariel-os/defmt,ariel-os/esp-println,ariel-os/logging-over-usb,ariel-os/single-core,ariel-os/executor-thread,ariel-os/idle-threads",
+              "--features=ariel-os/panic-printing,ariel-os/defmt,ariel-os/esp-println,ariel-os/idle-threads,ariel-os/logging-over-usb,ariel-os/single-core,ariel-os/executor-thread,ariel-os/hwrng,ariel-os/random,ariel-os/dhcpv4,ariel-os/ipv4,ariel-os/alloc,ariel-os/wifi-esp",
               "--message-format=json"
             ]
           },
@@ -15,32 +15,39 @@
             "CARGO_BUILD_TARGET": "riscv32imac-unknown-none-elf",
             "CARGO_TARGET_DIR": "./build/bin/espressif-esp32-c6-devkitc-1/cargo",
             "CARGO_TARGET_RISCV32IMAC_UNKNOWN_NONE_ELF_RUNNER": "espflash flash --monitor --log-format defmt",
-            "CARGO_TARGET_RISCV32IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS": "--cfg context=\"espressif-esp32-c6-devkitc-1\" --cfg context=\"esp32-c6-wroom-1\" --cfg context=\"esp32c6\" --cfg context=\"esp\" --cfg context=\"ariel-os\" --cfg context=\"default\" -Clink-arg=-Tlinkall.x --cfg stable -Cembed-bitcode=yes -Clto=fat -Ccodegen-units=1 -Clink-arg=-Tdefmt.x -C force-frame-pointers --cfg context=\"riscv\" -Clink-arg=-Tisr_stack.x -Clink-arg=-Tlinkme-region-alias.x -Clink-arg=-Tlinkme.x",
+            "CARGO_TARGET_RISCV32IMAC_UNKNOWN_NONE_ELF_RUSTFLAGS": "--cfg context=\"espressif-esp32-c6-devkitc-1\" --cfg context=\"esp32-c6-wroom-1\" --cfg context=\"esp32c6\" --cfg context=\"esp\" --cfg context=\"ariel-os\" --cfg context=\"default\" -Clink-arg=-Tlinkall.x --cfg stable -Cembed-bitcode=yes -Clto=fat -Ccodegen-units=1 -Clink-arg=-Tdefmt.x -C force-frame-pointers --cfg context=\"riscv\" -Clink-arg=-Tisr_stack.x -Clink-arg=-Tlinkme-region-alias.x -Clink-arg=-Tlinkme.x --cfg getrandom_backend=\"custom\"",
             "CONFIG_BOARD": "espressif-esp32-c6-devkitc-1",
-            "CONFIG_EXECUTOR_STACKSIZE": "8192",
-            "CONFIG_ISR_STACKSIZE": "4096",
+            "CONFIG_EXECUTOR_STACKSIZE": "65536",
+            "CONFIG_HEAPSIZE": "73728",
+            "CONFIG_ISR_STACKSIZE": "32768",
             "CONFIG_WIFI_NETWORK": "test-wifi",
             "CONFIG_WIFI_PASSWORD": "test-password",
             "DEFMT_LOG": "info,",
             "OPENOCD_ARGS": "",
-            "RUSTFLAGS": "--cfg context=\"espressif-esp32-c6-devkitc-1\" --cfg context=\"esp32-c6-wroom-1\" --cfg context=\"esp32c6\" --cfg context=\"esp\" --cfg context=\"ariel-os\" --cfg context=\"default\" -Clink-arg=-Tlinkall.x --cfg stable -Cembed-bitcode=yes -Clto=fat -Ccodegen-units=1 -Clink-arg=-Tdefmt.x -C force-frame-pointers --cfg context=\"riscv\" -Clink-arg=-Tisr_stack.x -Clink-arg=-Tlinkme-region-alias.x -Clink-arg=-Tlinkme.x",
+            "RUSTFLAGS": "--cfg context=\"espressif-esp32-c6-devkitc-1\" --cfg context=\"esp32-c6-wroom-1\" --cfg context=\"esp32c6\" --cfg context=\"esp\" --cfg context=\"ariel-os\" --cfg context=\"default\" -Clink-arg=-Tlinkall.x --cfg stable -Cembed-bitcode=yes -Clto=fat -Ccodegen-units=1 -Clink-arg=-Tdefmt.x -C force-frame-pointers --cfg context=\"riscv\" -Clink-arg=-Tisr_stack.x -Clink-arg=-Tlinkme-region-alias.x -Clink-arg=-Tlinkme.x --cfg getrandom_backend=\"custom\"",
             "SCRIPTS": "./scripts"
           },
           "features": [
             "ariel-os/panic-printing",
             "ariel-os/defmt",
             "ariel-os/esp-println",
+            "ariel-os/idle-threads",
             "ariel-os/logging-over-usb",
             "ariel-os/single-core",
             "ariel-os/executor-thread",
-            "ariel-os/idle-threads"
+            "ariel-os/hwrng",
+            "ariel-os/random",
+            "ariel-os/dhcpv4",
+            "ariel-os/ipv4",
+            "ariel-os/alloc",
+            "ariel-os/wifi-esp"
           ]
         },
         "check": {
           "allTargets": false,
           "command": "clippy",
           "extraArgs": [
-            "--features=ariel-os/panic-printing,ariel-os/defmt,ariel-os/esp-println,ariel-os/logging-over-usb,ariel-os/single-core,ariel-os/executor-thread,ariel-os/idle-threads"
+            "--features=ariel-os/panic-printing,ariel-os/defmt,ariel-os/esp-println,ariel-os/idle-threads,ariel-os/logging-over-usb,ariel-os/single-core,ariel-os/executor-thread,ariel-os/hwrng,ariel-os/random,ariel-os/dhcpv4,ariel-os/ipv4,ariel-os/alloc,ariel-os/wifi-esp"
           ]
         },
         "files": {

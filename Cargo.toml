@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = ["time","uart"] }
+ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = ["time","uart",  "csprng",
+"dns",
+"mdns",
+"tcp",] }
 ariel-os-boards = { path = "build/imports/ariel-os/src/ariel-os-boards" }
 
 esp-hal = { version = "~1.0", features = ["unstable"] }
@@ -14,7 +17,20 @@ esp-hal-smartled = { path= "/home/sautax/git/esp-hal-community/esp-hal-smartled"
 smart-leds = "0.4.0"
 embassy-time = { version = "0.5.1", default-features = false }
 embedded-io-async = { version = "0.6.1", default-features = false }
+serde_json = { version =  "1.0.151", default-features = false, features = ["alloc"] }
 
+
+# A bug in embedded-tls 0.18.0, which reqwless 0.14.0 depends on, makes this
+# temporarily needed.
+# The `heapless` feature is needed since 0.8.0-rc.2.
+der = { version = "0.8", default-features = false, features = ["heapless"] }
+
+reqwless = { version = "0.14.0", default-features = true, features = [
+  "embedded-tls",
+] }
+embassy-sync = "0.7.2"
+serde = { version = "1.0.229", features = ["derive"] , default-features = false }
+rand_core = "0.9.3"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

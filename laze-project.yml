@@ -8,3 +8,11 @@ apps:
   - name: winky-ariel
     context:
       - espressif-esp32-c6-devkitc-1
+    env:
+      global:
+        executor_stacksize_required:
+          - "65536"
+    selects:
+      - network
+      - random
+      - alloc
