@@ -61,7 +61,7 @@ async fn main(peripherals: pins::SmartLed) {
     // Configure RMT (Remote Control Transceiver) peripheral globally
     // <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/rmt.html>
     let rmt: Rmt<'_, esp_hal::Async> = {
-        let frequency: Rate = Rate::from_mhz(80);
+        let frequency: Rate = Rate::from_mhz(40);
 
         Rmt::new(peripherals.rmt, frequency)
     }
