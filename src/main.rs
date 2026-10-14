@@ -1,6 +1,10 @@
 #![no_main]
 #![no_std]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
+use der::time::Time;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 use esp_hal::{hmac::Error, rmt::Rmt, time::Rate};
 use esp_hal_smartled::{SmartLedsAdapterAsync, buffer_size_async};
@@ -11,7 +15,9 @@ use reqwless::{
 };
 use serde::{Deserialize, Serialize};
 use smart_leds::{
-    RGB8, SmartLedsWriteAsync, brightness, gamma,
+    RGB8, SmartLedsWriteAsync, brightness,
+    colors::BLUE,
+    gamma,
     hsv::{Hsv, hsv2rgb},
 };
 
@@ -33,9 +39,15 @@ use ariel_os::{
     uart::Baudrate,
 };
 
+use crate::LedStatus::WaitingForData;
+
 mod pins;
 
-static REPORT_CHANNEL: Channel<CriticalSectionRawMutex, Report, 10> = Channel::new();
+const MAX_REPORT_COUNT: usize = 30;
+const WAIT_BETWEEN_UPDATES: Duration = Duration::from_secs(60);
+
+static REPORT_CHANNEL: Channel<CriticalSectionRawMutex, Report, MAX_REPORT_COUNT> = Channel::new();
+static LED_CHANNEL: Channel<CriticalSectionRawMutex, LedStatus, 5> = Channel::new();
 
 const ENDPOINT_URL: &str = str_from_env_or!(
     "ENDPOINT_URL",
@@ -56,6 +68,18 @@ const HTTP_BUFFER_SIZE: usize = 1024;
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 2;
 
+#[derive(Debug, Clone, Copy)]
+enum LedStatus {
+    WaitingForData,
+    ProcessingLinkyFrame,
+    WaitingToSendReport,
+    SendingReport,
+}
+
+fn set_led_status(status: LedStatus) {
+    let _ = LED_CHANNEL.try_send(status);
+}
+
 #[ariel_os::task(autostart, peripherals)]
 async fn main(peripherals: pins::SmartLed) {
     // Configure RMT (Remote Control Transceiver) peripheral globally
@@ -75,32 +99,38 @@ async fn main(peripherals: pins::SmartLed) {
 
     let mut led = SmartLedsAdapterAsync::new(rmt_channel, peripherals.neo, &mut rmt_buffer);
 
-    let mut color = Hsv {
-        hue: 0,
-        sat: 255,
-        val: 255,
-    };
-    let mut data: RGB8;
-    let level = 10;
+    // let mut color = Hsv {
+    //     hue: 0,
+    //     sat: 255,
+    //     val: 255,
+    // };
 
+    // led1: linky side
+    let mut led1: RGB8 = BLUE;
+    // led2: network side
+    let mut led2: RGB8 = BLUE;
+
+    let level = 5;
+
+    let receiver = LED_CHANNEL.receiver();
     loop {
-        for hue in 0..=255 {
-            color.hue = hue;
+        // When sending to the LED, we do a gamma correction first (see smart_leds
+        // documentation for details) and then limit the brightness.
+        led.write(brightness(gamma([led1, led2, led2].into_iter()), level))
+            .await
+            .unwrap();
 
-            // info!("hue: {}", hue);
-            // Convert from the HSV color space (where we can easily transition from one
-            // color to the other) to the RGB color space that we can then send to the LED
-            data = hsv2rgb(color);
-
-            // info!("data: {:?}", Debug2Format(&data));
-
-            // When sending to the LED, we do a gamma correction first (see smart_leds
-            // documentation for details) and then limit the brightness to 10 out of 255 so
-            // that the output is not too bright.
-            led.write(brightness(gamma([data, data, data].into_iter()), level))
-                .await
-                .unwrap();
-            Timer::after(Duration::from_millis(10)).await;
+        // Limit time between updates
+        Timer::after_millis(10).await;
+        match receiver.receive().await {
+            // Orange
+            LedStatus::ProcessingLinkyFrame => led1 = RGB8::new(252, 141, 5),
+            // Blue
+            LedStatus::WaitingForData => led1 = RGB8::new(5, 231, 252),
+            // Orange
+            LedStatus::SendingReport => led2 = RGB8::new(252, 141, 5),
+            // Blue
+            LedStatus::WaitingToSendReport => led2 = RGB8::new(5, 231, 252),
         }
     }
 }
@@ -133,13 +163,28 @@ pub struct Report {
     /// Label: SINSTS, unit: VA
     pub apparent_power: Option<u32>,
 }
+// #[ariel_os::task(autostart)]
+// async fn dummy_data() {
+//     loop {
+//         Timer::after_secs(1).await;
 
+//         let _ = REPORT_CHANNEL.try_send(Report {
+//             active_energy_total: Some(10),
+//             apparent_power: Some(11),
+//         });
+//     }
+// }
 #[ariel_os::task(autostart, peripherals)]
 async fn reader(peripherals: pins::Linky) {
     info!("Starting UART test");
+    let standard_baudrate = Baudrate::_9600;
+    let historic_baudrate = Baudrate::Hal(ariel_os::hal::uart::Baudrate::from(1200));
 
     let mut config = hal::uart::Config::default();
-    config.baudrate = Baudrate::_9600;
+    // TODO: detect mode.
+    config.baudrate = standard_baudrate;
+    config.baudrate = historic_baudrate;
+
     config.data_bits = HalDataBits::Data7;
     config.parity = Parity::Even;
     config.stop_bits = StopBits::Stop1;
@@ -161,10 +206,11 @@ async fn reader(peripherals: pins::Linky) {
     let mut current_data = [0u8; PROCESS_BUFFER_SIZE];
 
     let mut reading_frame = false;
+    set_led_status(WaitingForData);
 
     loop {
         let mut input = [0u8; 32];
-        let n = uart.read(&mut input).await.unwrap_or(0);
+        let n = uart.read(&mut input).await;
 
         for char in input.iter() {
             if *char == FRAME_START {
@@ -173,7 +219,9 @@ async fn reader(peripherals: pins::Linky) {
                 current_data = [0; PROCESS_BUFFER_SIZE];
             } else if *char == FRAME_END {
                 reading_frame = false;
+                set_led_status(LedStatus::ProcessingLinkyFrame);
                 process_frame(&current_data[..current_data_index]).await;
+                set_led_status(WaitingForData);
             } else if reading_frame {
                 if current_data_index >= PROCESS_BUFFER_SIZE - 1 {
                     warn!("Buffer overrun");
@@ -271,6 +319,12 @@ fn parse_unsigned_integer(bytes: &[u8]) -> Option<u32> {
     str::parse(s).ok()
 }
 
+// Demo backend doesn't support bulk inserts so we push multiple reports in one object.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Reports {
+    pub reports: Vec<Report>,
+}
+
 #[ariel_os::task(autostart)]
 async fn sender() {
     let stack = net::network_stack().await.unwrap();
@@ -292,17 +346,41 @@ async fn sender() {
 
     let mut client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
 
+    // Wait for network to connect successfully, then disconnect from it.
     stack.wait_config_up().await;
     info!("Config up");
 
     let receiver = REPORT_CHANNEL.receiver();
-    loop {
-        let data = receiver.receive().await;
 
-        match serde_json::to_vec(&data) {
+    loop {
+        set_led_status(LedStatus::WaitingToSendReport);
+
+        hal::wifi::esp_wifi::disconnect();
+
+        info!("sender thread sleeping");
+        Timer::after(WAIT_BETWEEN_UPDATES).await;
+        set_led_status(LedStatus::SendingReport);
+
+        if receiver.is_empty() {
+            info!("No reports to send");
+            continue;
+        }
+
+        info!("Preparing to send reports...");
+
+        let mut reports = Vec::new();
+
+        while !receiver.is_empty() {
+            reports.push(receiver.receive().await);
+        }
+
+        hal::wifi::esp_wifi::connect();
+        stack.wait_config_up().await;
+
+        match serde_json::to_vec(&Reports { reports }) {
             Ok(body) => {
                 info!("sending via POST");
-                let res = send_http_get_request(&mut client, ENDPOINT_URL, &body).await;
+                let res = send_http_put_request(&mut client, ENDPOINT_URL, &body).await;
                 info!("http res : {:?}", Debug2Format(&res));
             }
             Err(e) => {
@@ -312,7 +390,7 @@ async fn sender() {
     }
 }
 
-async fn send_http_get_request(
+async fn send_http_put_request(
     client: &mut HttpClient<'_, TcpClient<'_, MAX_CONCURRENT_CONNECTIONS>, DnsSocket<'_>>,
     url: &str,
     body: &[u8],
@@ -334,7 +412,7 @@ async fn send_http_get_request(
     }
 
     if let Ok(body) = response.body().read_to_end().await {
-        if let Ok(body) = core::str::from_utf8(&body) {
+        if let Ok(body) = core::str::from_utf8(body) {
             info!("Response body:\n{}", body);
         } else {
             info!("Received a response body, but it is not valid UTF-8");
