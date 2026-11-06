@@ -1,44 +1,17 @@
-[package]
-name = "winky-ariel"
-version = "0.1.0"
+[workspace]
+resolver = "3"
+members = [
+    "firmware"
+]
+exclude = ["build"]
+
+
+[workspace.package]
 edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
 
-[dependencies]
-ariel-os = { path = "build/imports/ariel-os/src/ariel-os", features = [
-  "time",
-  "uart",
-  "csprng",
-  "dns",
-  "mdns",
-  "tcp",
-] }
-ariel-os-boards = { path = "build/imports/ariel-os/src/ariel-os-boards" }
+[workspace.dependencies]
 
-esp-hal = { version = "~1.0", features = ["unstable"] }
-esp-hal-smartled = { git = "https://github.com/kaspar030/esp-hal-community", rev = "1f88d903653b418e3b478810a8150f851b0e217c", features = [
-  "esp32c6",
-] }
-smart-leds = "0.4.0"
-embassy-time = { version = "0.5.1", default-features = false }
-embedded-io-async = { version = "0.6.1", default-features = false }
-serde_json = { version = "1.0.151", default-features = false, features = [
-  "alloc",
-] }
-
-
-# A bug in embedded-tls 0.18.0, which reqwless 0.14.0 depends on, makes this
-# temporarily needed.
-# The `heapless` feature is needed since 0.8.0-rc.2.
-der = { version = "0.8", default-features = false, features = ["heapless"] }
-
-reqwless = { version = "0.14.0", default-features = true, features = [
-  "embedded-tls",
-] }
-embassy-sync = "0.7.2"
-serde = { version = "1.0.229", features = ["derive"], default-features = false }
-rand_core = "0.9.3"
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-  'cfg(context, values(any()))',
-] }
+# ariel-os-embassy-common = { }
+# ariel-os-hal = { }
