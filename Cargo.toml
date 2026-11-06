@@ -1,7 +1,8 @@
 [workspace]
 resolver = "3"
 members = [
-    "firmware"
+    "firmware",
+    "winky-board",
 ]
 exclude = ["build"]
 
@@ -13,5 +14,6 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 
-# ariel-os-embassy-common = { }
-# ariel-os-hal = { }
+ariel-os-embassy-common = { path = "build/imports/ariel-os/src/ariel-os-embassy-common" }
+ariel-os-hal = { path = "build/imports/ariel-os/src/ariel-os-hal" }
+winky-board = { path = "winky-board" }

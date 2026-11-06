@@ -1,0 +1,24 @@
+# @generated
+
+[package]
+name = "winky-board"
+
+[package.edition]
+workspace = true
+
+[package.license]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[dependencies.ariel-os-embassy-common]
+workspace = true
+
+[dependencies.ariel-os-hal]
+workspace = true
+
+[features]
+no-boards = []
+
+[lints]

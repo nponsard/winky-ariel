@@ -1,8 +1,20 @@
 imports:
   - git:
-      url: https://github.com/ariel-os/ariel-os
-      branch: main
+      url: https://github.com/nponsard/ariel-os
+      branch: patch/winky
     dldir: ariel-os
 
+apps:
+  - name: winky-ariel
+    context:
+      - winky-esp32-c6
+    env:
+      global:
+        executor_stacksize_required:
+          - "65536"
+    selects:
+      - network
+      - random
+      - alloc
 subdirs:
-  - firmware
+  - winky-board

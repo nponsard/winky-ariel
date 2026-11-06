@@ -24,19 +24,13 @@ use smart_leds::{
 use embedded_io_async::Read as _;
 
 use ariel_os::{
-    config::str_from_env_or,
-    hal::{
+    config::str_from_env_or, gpio::{Input, Pull}, hal::{
         self,
         uart::{DataBits as HalDataBits, Parity, StopBits},
-    },
-    log::{Debug2Format, Hex, debug, info, warn},
-    net,
-    reexports::embassy_net::{
+    }, log::{Debug2Format, Hex, debug, info, warn}, net, reexports::embassy_net::{
         dns::DnsSocket,
         tcp::client::{TcpClient, TcpClientState},
-    },
-    time::{Duration, Timer},
-    uart::Baudrate,
+    }, time::{Duration, Timer}, uart::Baudrate,
 };
 
 use crate::LedStatus::WaitingForData;
@@ -155,6 +149,13 @@ const PROCESS_BUFFER_SIZE: usize = 4096;
 // const ACTIVE_ENERGY_TOTAL_LABEL: &str = "EAST";
 // // VA
 // const APPARENT_POWER_LABEL: &str = "SINSTS";
+
+#[ariel_os::task(autostart, peripherals)]
+async fn buttons_test(peripherals: winky_board::pins::ButtonPeripherals) {
+    let mut btn0 = Input::builder(peripherals.button0, Pull::Up)
+        .build_with_interrupt()
+        .unwrap();
+}
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Report {

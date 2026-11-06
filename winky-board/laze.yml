@@ -1,0 +1,8 @@
+# yamllint disable-file
+
+builders:
+- name: winky-esp32-c6
+  parent: esp32c6
+  provides:
+  - has_buttons
+  - has_usb_cdc_acm_port

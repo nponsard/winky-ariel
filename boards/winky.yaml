@@ -1,0 +1,10 @@
+version: 0.4.1
+targets:
+  winky-esp32-c6:
+    chip: esp32c6
+    flags:
+      - has_usb_cdc_acm_port
+    buttons:
+      # B1
+      - pin: GPIO9
+        active: low
