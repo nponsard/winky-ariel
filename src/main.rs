@@ -121,7 +121,7 @@ async fn main(peripherals: pins::SmartLed) {
             .unwrap();
 
         // Limit time between updates
-        Timer::after_millis(10).await;
+        Timer::after_millis(100).await;
         match receiver.receive().await {
             // Orange
             LedStatus::ProcessingLinkyFrame => led1 = RGB8::new(252, 141, 5),
@@ -143,8 +143,10 @@ const FRAME_END: u8 = 0x03;
 const DATA_START: u8 = 0x0A;
 // CR
 const DATA_END: u8 = 0x0D;
-// HT
-const SEPARATOR: u8 = 0x09;
+// HT, this changes between historic and standard modes.
+// const SEPARATOR: u8 = 0x09;
+const SEPARATOR: u8 = 0x20;
+
 
 const LABEL_MAX_SIZE: usize = 16;
 const DATA_MAX_SIZE: usize = 100;
@@ -292,12 +294,15 @@ async fn process_frame(buffer: &[u8]) {
         };
         let label = label.trim_matches(|c| c == char::from(0));
         match label {
-            "SINSTS" => {
+            // PAPP is for historic mode.
+            "SINSTS" | "PAPP" => {
                 let d = parse_unsigned_integer(&field.data);
 
                 report.apparent_power = d;
             }
-            "EAST" => {
+
+            // BASE is for historic mode and depends on the contract.
+            "EAST" | "BASE" => {
                 report.active_energy_total = parse_unsigned_integer(&field.data);
             }
             _ => {
