@@ -3,6 +3,7 @@ edition = "2024"
 resolver = "3"
 members = [
     "crates/app",
+    "crates/coprocessor",
     "crates/tic-parser",
 ]
 

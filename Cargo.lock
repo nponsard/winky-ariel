@@ -91,7 +91,7 @@ dependencies = [
  "embedded-alloc",
  "esp-alloc",
  "esp-hal",
- "esp-metadata-generated",
+ "esp-metadata-generated 0.3.0",
 ]
 
 [[package]]
@@ -643,6 +643,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ff10625fd0ac447827aa30ea8b861fead473bb60aeb73af6c1c58caf0d1299"
 dependencies = [
  "custom_derive",
+]
+
+[[package]]
+name = "coprocessor"
+version = "0.1.0"
+dependencies = [
+ "esp-lp-hal",
+ "panic-halt",
 ]
 
 [[package]]
@@ -1620,8 +1628,8 @@ dependencies = [
  "document-features",
  "embedded-storage",
  "esp-config",
- "esp-hal-procmacros",
- "esp-metadata-generated",
+ "esp-hal-procmacros 0.21.0",
+ "esp-metadata-generated 0.3.0",
  "esp-rom-sys",
  "jiff",
  "strum",
@@ -1633,7 +1641,7 @@ version = "0.6.1"
 source = "git+https://github.com/ariel-os/esp-hal?rev=531c629afdd80ea464682ce7f4db8baed97967a6#531c629afdd80ea464682ce7f4db8baed97967a6"
 dependencies = [
  "document-features",
- "esp-metadata-generated",
+ "esp-metadata-generated 0.3.0",
  "serde",
  "serde_yaml",
  "somni-expr",
@@ -1666,8 +1674,8 @@ dependencies = [
  "embedded-io-async 0.7.0",
  "enumset",
  "esp-config",
- "esp-hal-procmacros",
- "esp-metadata-generated",
+ "esp-hal-procmacros 0.21.0",
+ "esp-metadata-generated 0.3.0",
  "esp-riscv-rt",
  "esp-rom-sys",
  "esp-sync",
@@ -1698,6 +1706,20 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-procmacros"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fd82a6506fb08d53a1086d165d92f085717aa9c59e67ac87a9e6f8acdcf6897"
+dependencies = [
+ "document-features",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "termcolor",
+]
+
+[[package]]
+name = "esp-hal-procmacros"
 version = "0.21.0"
 source = "git+https://github.com/ariel-os/esp-hal?rev=531c629afdd80ea464682ce7f4db8baed97967a6#531c629afdd80ea464682ce7f4db8baed97967a6"
 dependencies = [
@@ -1722,6 +1744,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "esp-lp-hal"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cc0625e0a29a8d5c05a8daf7799d4166e641fb8af52e591997a49ffe8eff964"
+dependencies = [
+ "cfg-if",
+ "document-features",
+ "embedded-hal 1.0.0",
+ "embedded-hal-nb",
+ "esp-hal-procmacros 0.20.0",
+ "esp-metadata-generated 0.2.0",
+ "esp32c6-lp",
+ "nb 1.1.0",
+ "riscv",
+]
+
+[[package]]
+name = "esp-metadata-generated"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b18b1787dd3adea642fb529dd83fe558a08ace365bbaede4643a8959992900f4"
+
+[[package]]
 name = "esp-metadata-generated"
 version = "0.3.0"
 source = "git+https://github.com/ariel-os/esp-hal?rev=531c629afdd80ea464682ce7f4db8baed97967a6#531c629afdd80ea464682ce7f4db8baed97967a6"
@@ -1743,7 +1788,7 @@ source = "git+https://github.com/ariel-os/esp-hal?rev=531c629afdd80ea464682ce7f4
 dependencies = [
  "cfg-if",
  "document-features",
- "esp-metadata-generated",
+ "esp-metadata-generated 0.3.0",
 ]
 
 [[package]]
@@ -1755,7 +1800,7 @@ dependencies = [
  "document-features",
  "embassy-sync 0.6.2",
  "embassy-sync 0.7.2",
- "esp-metadata-generated",
+ "esp-metadata-generated 0.3.0",
  "riscv",
  "xtensa-lx",
 ]
@@ -1808,6 +1853,16 @@ name = "esp32c6"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5e511df672d79cd63365c92045135e01ba952b6bddd25b660baff5e1110f6b"
+dependencies = [
+ "critical-section",
+ "vcell",
+]
+
+[[package]]
+name = "esp32c6-lp"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1bd02a62890ad56dd8c8e4a993decaad03265a8fdf1e965948ddad19ad35065"
 dependencies = [
  "critical-section",
  "vcell",
@@ -2569,6 +2624,12 @@ dependencies = [
  "primeorder",
  "sha2",
 ]
+
+[[package]]
+name = "panic-halt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
 
 [[package]]
 name = "parking"
