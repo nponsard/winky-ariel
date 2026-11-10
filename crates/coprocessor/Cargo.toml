@@ -1,8 +1,10 @@
+# Put it in its own workspace otherwise it messes up dependencies.
+[workspace]
 [package]
 name = "coprocessor"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-esp-lp-hal = { version = "0.3.0", features = ["esp32c6"]}
+esp-lp-hal = { version = "0.3.0", features = ["esp32c6"] }
 panic-halt = "0.2.0"

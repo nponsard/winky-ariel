@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 ariel-os = { workspace = true, features = [
   "time",
-  "uart",
+  # "uart",
   "csprng",
   "dns",
   "mdns",

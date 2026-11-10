@@ -6,9 +6,19 @@ extern crate alloc;
 use alloc::vec::Vec;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 use esp_hal::{
+    gpio::lp_io::{LowPowerInput, LowPowerOutput},
+    load_lp_code,
+    lp_core::{LpCore, LpCoreWakeupSource},
+    peripherals,
     rmt::Rmt,
+    rtc_cntl::{Rtc, sleep::WakeFromLpCoreWakeupSource},
     time::Rate,
-    uart::{IoError, RxError::ParityMismatch},
+    uart::{
+        DataBits, IoError, Parity,
+        RxError::{self, ParityMismatch},
+        StopBits, Uart,
+        lp_uart::LpUart,
+    },
 };
 use esp_hal_smartled::{SmartLedsAdapterAsync, buffer_size_async};
 use reqwless::{
@@ -23,10 +33,7 @@ use embedded_io_async::Read as _;
 
 use ariel_os::{
     config::str_from_env_or,
-    hal::{
-        self,
-        uart::{DataBits as HalDataBits, Parity, StopBits},
-    },
+    hal,
     log::{Debug2Format, error, info, warn},
     net,
     reexports::embassy_net::{
@@ -34,7 +41,6 @@ use ariel_os::{
         tcp::client::{TcpClient, TcpClientState},
     },
     time::{Duration, Timer},
-    uart::Baudrate,
 };
 use tic_parser::{ParserError, ParserStatus, Report, TicMode, TicParser};
 
@@ -155,41 +161,51 @@ async fn main(peripherals: pins::SmartLed) {
 async fn reader(mut peripherals: pins::Linky) {
     info!("Starting UART TIC receiver");
 
+    let mut rtc = Rtc::new(peripherals.lpwr);
+
+    // If we woke up from sleep.
+    if rtc.time_since_boot() > esp_hal::time::Duration::from_secs(2) {
+        // TODO:
+        // - read coprocessor data
+        // - mark data as read
+        // - send it through wifi
+
+        // Go back to sleep
+        rtc.sleep_deep(&[&WakeFromLpCoreWakeupSource::new()]);
+    }
+
+    let mut lp_core = LpCore::new(peripherals.lp_core);
+    lp_core.stop();
     let mut tic_mode = TicMode::Standard;
-    loop {
-        let baudrate = Baudrate::Hal(ariel_os::hal::uart::Baudrate::from(tic_mode.baudrate()));
 
-        let mut config = hal::uart::Config::default();
-        config.baudrate = baudrate;
+    // This loop tries to determine which mode to use.
+    'test_loop: loop {
+        let config = esp_hal::uart::Config::default()
+            .with_baudrate(tic_mode.baudrate())
+            .with_data_bits(DataBits::_7)
+            .with_parity(Parity::Even)
+            .with_stop_bits(StopBits::_1);
 
-        config.data_bits = HalDataBits::Data7;
-        config.parity = Parity::Even;
-        config.stop_bits = StopBits::Stop1;
         info!("Selected configuration: {:?}", config);
 
-        let mut rx_buf = [0u8; 32];
-        let mut tx_buf = [0u8; 32];
-
-        let mut uart = pins::TestUart::new(
-            peripherals.rx.reborrow(),
-            peripherals.dummy_tx.reborrow(),
-            &mut rx_buf,
-            &mut tx_buf,
-            config,
-        )
-        .expect("Invalid UART configuration");
+        let mut uart = Uart::new(peripherals.uart.reborrow(), config)
+            .unwrap()
+            .with_rx(peripherals.dummy_tx.reborrow())
+            .with_tx(peripherals.rx.reborrow())
+            .into_async();
 
         let mut parser = TicParser::new(TicMode::Historic);
         set_led_status(WaitingForData);
 
         loop {
             let mut input = [0u8; 32];
-            match uart.read(&mut input).await {
+            match uart.read_async(&mut input).await {
                 Ok(n) => match parser.add_data(&input[..n]) {
                     Ok(ParserStatus::ParsedFrame(report)) => {
-                        set_led_status(LedStatus::ProcessingLinkyFrame);
-                        let _ = REPORT_CHANNEL.try_send(report);
-                        set_led_status(LedStatus::WaitingForData);
+                        // set_led_status(LedStatus::ProcessingLinkyFrame);
+                        // let _ = REPORT_CHANNEL.try_send(report);
+                        // set_led_status(LedStatus::WaitingForData);
+                        break 'test_loop;
                     }
                     Ok(_) => {}
                     Err(ParserError::BufferFull) => {
@@ -198,7 +214,7 @@ async fn reader(mut peripherals: pins::Linky) {
                     }
                 },
                 // Most of the time this means the wrong mode is used, switch TIC mode.
-                Err(IoError::Rx(ParityMismatch)) => break,
+                Err(RxError::ParityMismatch) => break,
                 Err(e) => {
                     error!("{:?}", e);
                 }
@@ -212,6 +228,24 @@ async fn reader(mut peripherals: pins::Linky) {
             tic_mode = TicMode::Historic
         }
     }
+
+    let config = esp_hal::uart::Config::default()
+        .with_baudrate(tic_mode.baudrate())
+        .with_data_bits(DataBits::_7)
+        .with_parity(Parity::Even)
+        .with_stop_bits(StopBits::_1);
+
+    let tx = LowPowerOutput::new(peripherals.dummy_tx);
+    let rx = LowPowerInput::new(peripherals.rx);
+
+    let lp_uart = LpUart::new(peripherals.lp_uart, config, tx, rx);
+
+    let lp_code =
+        load_lp_code!("crates/coprocessor/target/riscv32imac-unknown-none-elf/release/coprocessor");
+
+    lp_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_uart);
+
+    rtc.sleep_deep(&[&WakeFromLpCoreWakeupSource::new()]);
 }
 
 #[ariel_os::task(autostart)]
