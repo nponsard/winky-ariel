@@ -249,10 +249,10 @@ impl Field {
         let mut data = [0u8; DATA_MAX_SIZE];
 
         let len = ref_label.len().min(LABEL_MAX_SIZE);
-        label[..len].copy_from_slice(ref_label);
+        label[..len].copy_from_slice(&ref_label[..len]);
 
         let len = ref_data.len().min(DATA_MAX_SIZE);
-        data[..len].copy_from_slice(ref_data);
+        data[..len].copy_from_slice(&ref_data[..len]);
 
         Self { label, data }
     }
