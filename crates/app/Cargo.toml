@@ -1,0 +1,45 @@
+[package]
+name = "winky-ariel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ariel-os = { workspace = true, features = [
+  "time",
+  "uart",
+  "csprng",
+  "dns",
+  "mdns",
+  "tcp",
+] }
+ariel-os-boards = { workspace = true }
+
+tic-parser = { workspace = true }
+
+esp-hal = { workspace = true, features = ["unstable"] }
+esp-hal-smartled = { workspace = true, features = [
+  "esp32c6",
+] }
+smart-leds = { workspace = true }
+embassy-time = { workspace = true, default-features = false }
+embedded-io-async = { workspace = true, default-features = false }
+serde_json = { version = "1.0.151", default-features = false, features = [
+  "alloc",
+] }
+
+
+
+# A bug in embedded-tls 0.18.0, which reqwless 0.14.0 depends on, makes this
+# temporarily needed.
+# The `heapless` feature is needed since 0.8.0-rc.2.
+der = { workspace = true, default-features = false, features = ["heapless"] }
+
+reqwless = { workspace = true, default-features = true, features = [
+  "embedded-tls",
+] }
+embassy-sync = { workspace = true }
+serde = { version = "1.0.229", features = ["derive"], default-features = false }
+rand_core = { workspace = true }
+
+[lints]
+workspace = true

@@ -3493,6 +3493,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tic-parser"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+ "serde",
+]
+
+[[package]]
 name = "time"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3757,6 +3765,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-leds",
+ "tic-parser",
 ]
 
 [[package]]

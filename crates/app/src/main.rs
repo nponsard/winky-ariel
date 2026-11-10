@@ -4,9 +4,8 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use der::time::Time;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
-use esp_hal::{hmac::Error, rmt::Rmt, time::Rate};
+use esp_hal::{rmt::Rmt, time::Rate};
 use esp_hal_smartled::{SmartLedsAdapterAsync, buffer_size_async};
 use reqwless::{
     client::{HttpClient, TlsConfig, TlsVerify},
@@ -14,12 +13,7 @@ use reqwless::{
     request::{Method, RequestBuilder},
 };
 use serde::{Deserialize, Serialize};
-use smart_leds::{
-    RGB8, SmartLedsWriteAsync, brightness,
-    colors::BLUE,
-    gamma,
-    hsv::{Hsv, hsv2rgb},
-};
+use smart_leds::{RGB8, SmartLedsWriteAsync, brightness, colors::BLUE, gamma};
 
 use embedded_io_async::Read as _;
 
@@ -29,7 +23,7 @@ use ariel_os::{
         self,
         uart::{DataBits as HalDataBits, Parity, StopBits},
     },
-    log::{Debug2Format, Hex, debug, info, warn},
+    log::{Debug2Format, error, info, warn},
     net,
     reexports::embassy_net::{
         dns::DnsSocket,
@@ -38,6 +32,7 @@ use ariel_os::{
     time::{Duration, Timer},
     uart::Baudrate,
 };
+use tic_parser::{ParserError, ParserStatus, Report, TicMode, TicParser};
 
 use crate::LedStatus::WaitingForData;
 
@@ -74,6 +69,12 @@ enum LedStatus {
     ProcessingLinkyFrame,
     WaitingToSendReport,
     SendingReport,
+}
+
+// Demo backend doesn't support bulk inserts so we push multiple reports in one object.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Reports {
+    pub reports: Vec<Report>,
 }
 
 fn set_led_status(status: LedStatus) {
@@ -135,36 +136,6 @@ async fn main(peripherals: pins::SmartLed) {
     }
 }
 
-// New linky separators
-
-const FRAME_START: u8 = 0x02;
-const FRAME_END: u8 = 0x03;
-// LF
-const DATA_START: u8 = 0x0A;
-// CR
-const DATA_END: u8 = 0x0D;
-// HT, this changes between historic and standard modes.
-// const SEPARATOR: u8 = 0x09;
-const SEPARATOR: u8 = 0x20;
-
-
-const LABEL_MAX_SIZE: usize = 16;
-const DATA_MAX_SIZE: usize = 100;
-
-const PROCESS_BUFFER_SIZE: usize = 4096;
-
-// // Wh
-// const ACTIVE_ENERGY_TOTAL_LABEL: &str = "EAST";
-// // VA
-// const APPARENT_POWER_LABEL: &str = "SINSTS";
-
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct Report {
-    /// Label: EAST, unit: Wh
-    pub active_energy_total: Option<u32>,
-    /// Label: SINSTS, unit: VA
-    pub apparent_power: Option<u32>,
-}
 // #[ariel_os::task(autostart)]
 // async fn dummy_data() {
 //     loop {
@@ -204,130 +175,27 @@ async fn reader(peripherals: pins::Linky) {
     )
     .expect("Invalid UART configuration");
 
-    let mut current_data_index = 0;
-    let mut current_data = [0u8; PROCESS_BUFFER_SIZE];
-
-    let mut reading_frame = false;
+    let mut parser = TicParser::new(TicMode::Historic);
     set_led_status(WaitingForData);
 
     loop {
         let mut input = [0u8; 32];
-        let n = uart.read(&mut input).await;
-
-        for char in input.iter() {
-            if *char == FRAME_START {
-                reading_frame = true;
-                current_data_index = 0;
-                current_data = [0; PROCESS_BUFFER_SIZE];
-            } else if *char == FRAME_END {
-                reading_frame = false;
-                set_led_status(LedStatus::ProcessingLinkyFrame);
-                process_frame(&current_data[..current_data_index]).await;
-                set_led_status(WaitingForData);
-            } else if reading_frame {
-                if current_data_index >= PROCESS_BUFFER_SIZE - 1 {
-                    warn!("Buffer overrun");
-                    current_data_index = 0;
-                    current_data = [0; PROCESS_BUFFER_SIZE];
-                    reading_frame = false;
-                    continue;
+        if let Ok(n) = uart.read(&mut input).await {
+            match parser.add_data(&input[..n]) {
+                Ok(ParserStatus::ParsedFrame(report)) => {
+                    set_led_status(LedStatus::ProcessingLinkyFrame);
+                    let _ = REPORT_CHANNEL.try_send(report);
+                    set_led_status(LedStatus::WaitingForData);
                 }
-
-                current_data[current_data_index] = *char;
-                current_data_index += 1;
+                Ok(_) => {}
+                Err(ParserError::BufferFull) => {
+                    error!("Buffer full");
+                    parser = TicParser::new(TicMode::Historic)
+                }
             }
         }
         // info!("Got: {}", Hex(input));
     }
-}
-
-pub struct Field {
-    pub label: [u8; LABEL_MAX_SIZE],
-    pub data: [u8; DATA_MAX_SIZE],
-}
-impl Field {
-    pub fn new(ref_label: &[u8], ref_data: &[u8]) -> Self {
-        let mut label = [0u8; LABEL_MAX_SIZE];
-        let mut data = [0u8; DATA_MAX_SIZE];
-
-        let len = ref_label.len().min(LABEL_MAX_SIZE);
-        label[..len].copy_from_slice(&ref_label[..len]);
-
-        let len = ref_data.len().min(DATA_MAX_SIZE);
-        data[..len].copy_from_slice(&ref_data[..len]);
-
-        Self { label, data }
-    }
-}
-
-fn parse_buffer(buffer: &[u8]) -> impl Iterator<Item = Field> {
-    buffer.split(|c| *c == DATA_START).filter_map(|d| {
-        let mut split = d.split(|c| *c == SEPARATOR);
-
-        let ref_label = split.next()?;
-
-        let ref_time_or_data = split.next()?;
-        let ref_data_or_checksum = split.next()?;
-
-        // If we have one more field it means whe had a timestamp in there.
-        let ref_data = if split.next().is_some() {
-            ref_data_or_checksum
-        } else {
-            ref_time_or_data
-        };
-
-        Some(Field::new(ref_label, ref_data))
-    })
-}
-
-async fn process_frame(buffer: &[u8]) {
-    let data = unsafe { str::from_utf8_unchecked(buffer) };
-
-    debug!("Frame: {}", data);
-
-    let fields = parse_buffer(buffer);
-
-    let mut report = Report::default();
-    for field in fields {
-        let Ok(label) = str::from_utf8(&field.label) else {
-            continue;
-        };
-        let label = label.trim_matches(|c| c == char::from(0));
-        match label {
-            // PAPP is for historic mode.
-            "SINSTS" | "PAPP" => {
-                let d = parse_unsigned_integer(&field.data);
-
-                report.apparent_power = d;
-            }
-
-            // BASE is for historic mode and depends on the contract.
-            "EAST" | "BASE" => {
-                report.active_energy_total = parse_unsigned_integer(&field.data);
-            }
-            _ => {
-                debug!("Ignoring {}, {}", label, Hex(label.as_bytes()));
-            }
-        }
-    }
-
-    info!("report : {:?}", Debug2Format(&report));
-    REPORT_CHANNEL.try_send(report);
-}
-
-fn parse_unsigned_integer(bytes: &[u8]) -> Option<u32> {
-    let s = str::from_utf8(bytes)
-        .ok()?
-        // Remove trailling null bytes.
-        .trim_matches(|c| c == char::from(0));
-
-    str::parse(s).ok()
-}
-
-// Demo backend doesn't support bulk inserts so we push multiple reports in one object.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Reports {
-    pub reports: Vec<Report>,
 }
 
 #[ariel_os::task(autostart)]
