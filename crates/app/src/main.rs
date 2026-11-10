@@ -5,7 +5,11 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
-use esp_hal::{rmt::Rmt, time::Rate};
+use esp_hal::{
+    rmt::Rmt,
+    time::Rate,
+    uart::{IoError, RxError::ParityMismatch},
+};
 use esp_hal_smartled::{SmartLedsAdapterAsync, buffer_size_async};
 use reqwless::{
     client::{HttpClient, TlsConfig, TlsVerify},
@@ -148,53 +152,65 @@ async fn main(peripherals: pins::SmartLed) {
 //     }
 // }
 #[ariel_os::task(autostart, peripherals)]
-async fn reader(peripherals: pins::Linky) {
-    info!("Starting UART test");
-    let standard_baudrate = Baudrate::_9600;
-    let historic_baudrate = Baudrate::Hal(ariel_os::hal::uart::Baudrate::from(1200));
+async fn reader(mut peripherals: pins::Linky) {
+    info!("Starting UART TIC receiver");
 
-    let mut config = hal::uart::Config::default();
-    // TODO: detect mode.
-    config.baudrate = standard_baudrate;
-    config.baudrate = historic_baudrate;
-
-    config.data_bits = HalDataBits::Data7;
-    config.parity = Parity::Even;
-    config.stop_bits = StopBits::Stop1;
-    info!("Selected configuration: {:?}", config);
-
-    let mut rx_buf = [0u8; 32];
-    let mut tx_buf = [0u8; 32];
-
-    let mut uart = pins::TestUart::new(
-        peripherals.rx,
-        peripherals.dummy_tx,
-        &mut rx_buf,
-        &mut tx_buf,
-        config,
-    )
-    .expect("Invalid UART configuration");
-
-    let mut parser = TicParser::new(TicMode::Historic);
-    set_led_status(WaitingForData);
-
+    let mut tic_mode = TicMode::Standard;
     loop {
-        let mut input = [0u8; 32];
-        if let Ok(n) = uart.read(&mut input).await {
-            match parser.add_data(&input[..n]) {
-                Ok(ParserStatus::ParsedFrame(report)) => {
-                    set_led_status(LedStatus::ProcessingLinkyFrame);
-                    let _ = REPORT_CHANNEL.try_send(report);
-                    set_led_status(LedStatus::WaitingForData);
-                }
-                Ok(_) => {}
-                Err(ParserError::BufferFull) => {
-                    error!("Buffer full");
-                    parser = TicParser::new(TicMode::Historic)
+        let baudrate = Baudrate::Hal(ariel_os::hal::uart::Baudrate::from(tic_mode.baudrate()));
+
+        let mut config = hal::uart::Config::default();
+        config.baudrate = baudrate;
+
+        config.data_bits = HalDataBits::Data7;
+        config.parity = Parity::Even;
+        config.stop_bits = StopBits::Stop1;
+        info!("Selected configuration: {:?}", config);
+
+        let mut rx_buf = [0u8; 32];
+        let mut tx_buf = [0u8; 32];
+
+        let mut uart = pins::TestUart::new(
+            peripherals.rx.reborrow(),
+            peripherals.dummy_tx.reborrow(),
+            &mut rx_buf,
+            &mut tx_buf,
+            config,
+        )
+        .expect("Invalid UART configuration");
+
+        let mut parser = TicParser::new(TicMode::Historic);
+        set_led_status(WaitingForData);
+
+        loop {
+            let mut input = [0u8; 32];
+            match uart.read(&mut input).await {
+                Ok(n) => match parser.add_data(&input[..n]) {
+                    Ok(ParserStatus::ParsedFrame(report)) => {
+                        set_led_status(LedStatus::ProcessingLinkyFrame);
+                        let _ = REPORT_CHANNEL.try_send(report);
+                        set_led_status(LedStatus::WaitingForData);
+                    }
+                    Ok(_) => {}
+                    Err(ParserError::BufferFull) => {
+                        error!("Buffer full, trying other TIC mode");
+                        break;
+                    }
+                },
+                // Most of the time this means the wrong mode is used, switch TIC mode.
+                Err(IoError::Rx(ParityMismatch)) => break,
+                Err(e) => {
+                    error!("{:?}", e);
                 }
             }
+            // info!("Got: {}", Hex(input));
         }
-        // info!("Got: {}", Hex(input));
+        // Exiting the loop means something went wrong, try the other mode.
+        if tic_mode == TicMode::Historic {
+            tic_mode = TicMode::Standard;
+        } else {
+            tic_mode = TicMode::Historic
+        }
     }
 }
 

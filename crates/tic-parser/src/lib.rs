@@ -12,8 +12,11 @@ const DATA_START: u8 = 0x0A;
 // CR
 const DATA_END: u8 = 0x0D;
 // HT, this changes between historic and standard modes.
-// const SEPARATOR: u8 = 0x09;
-const SEPARATOR: u8 = 0x20;
+const SEPARATOR_STANDARD: u8 = 0x09;
+const SEPARATOR_HISTORIC: u8 = 0x20;
+
+pub const BAUDRATE_STANDARD: u32 = 9600;
+pub const BAUDRATE_HISTORIC: u32 = 1200;
 
 const LABEL_MAX_SIZE: usize = 16;
 const DATA_MAX_SIZE: usize = 100;
@@ -73,6 +76,21 @@ pub enum TicMode {
     Standard,
 }
 
+impl TicMode {
+    fn separator(&self) -> u8 {
+        match self {
+            Self::Historic => SEPARATOR_HISTORIC,
+            Self::Standard => SEPARATOR_STANDARD,
+        }
+    }
+    pub fn baudrate(&self) -> u32 {
+        match self {
+            Self::Historic => BAUDRATE_HISTORIC,
+            Self::Standard => BAUDRATE_STANDARD,
+        }
+    }
+}
+
 pub struct TicParser {
     buffer: [u8; PROCESS_BUFFER_SIZE],
     current_index: usize,
@@ -115,7 +133,7 @@ impl TicParser {
 
     fn parse_buffer(&self, buffer: &[u8]) -> impl Iterator<Item = Field> {
         buffer.split(|c| *c == DATA_START).filter_map(|d| {
-            let mut split = d.split(|c| *c == SEPARATOR);
+            let mut split = d.split(|c| *c == self.mode.separator());
 
             let ref_label = split.next()?;
 
