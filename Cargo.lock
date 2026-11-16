@@ -585,6 +585,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-types"
+version = "0.1.0"
+dependencies = [
+ "tic-parser",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3750,6 +3757,7 @@ version = "0.1.0"
 dependencies = [
  "ariel-os",
  "ariel-os-boards",
+ "common-types",
  "der 0.8.1",
  "embassy-sync 0.7.2",
  "embassy-time",

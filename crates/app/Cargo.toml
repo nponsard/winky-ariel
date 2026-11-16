@@ -14,6 +14,7 @@ ariel-os = { workspace = true, features = [
 ] }
 ariel-os-boards = { workspace = true }
 
+common-types = { workspace = true }
 tic-parser = { workspace = true }
 
 esp-hal = { workspace = true, features = ["unstable"] }

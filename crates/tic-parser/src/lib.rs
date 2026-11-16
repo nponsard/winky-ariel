@@ -2,6 +2,8 @@
 
 // New linky separators
 
+use core::{num::NonZeroU32, str::FromStr};
+
 use defmt::{Debug2Format, debug, info};
 use serde::{Deserialize, Serialize};
 
@@ -31,9 +33,9 @@ const PROCESS_BUFFER_SIZE: usize = 4096;
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Report {
     /// Label: EAST, unit: Wh
-    pub active_energy_total: Option<u32>,
+    pub active_energy_total: Option<NonZeroU32>,
     /// Label: SINSTS, unit: VA
-    pub apparent_power: Option<u32>,
+    pub apparent_power: Option<NonZeroU32>,
 }
 
 pub struct Field {
@@ -186,7 +188,7 @@ impl TicParser {
         Ok(ParserStatus::ParsedFrame(report))
     }
 }
-fn parse_unsigned_integer(bytes: &[u8]) -> Option<u32> {
+fn parse_unsigned_integer<T: FromStr>(bytes: &[u8]) -> Option<T> {
     let s = str::from_utf8(bytes)
         .ok()?
         // Remove trailling null bytes.

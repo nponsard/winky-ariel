@@ -3,6 +3,7 @@ edition = "2024"
 resolver = "3"
 members = [
     "crates/app",
+    "crates/common-types",
     # "crates/coprocessor",
     "crates/tic-parser",
 ]
@@ -11,6 +12,8 @@ exclude = ["build"]
 
 [workspace.dependencies]
 tic-parser = { path = "crates/tic-parser" }
+common-types = { path = "crates/common-types" }
+
 
 ariel-os = { path = "build/imports/ariel-os/src/ariel-os" }
 ariel-os-boards = { path = "build/imports/ariel-os/src/ariel-os-boards" }
